@@ -1,0 +1,16 @@
+# Ambientes Virtuais (Nunca suba o motor do Python)
+venv/
+env/
+ENV/
+
+# Variáveis de Ambiente (Segurança Máxima)
+.env
+.env.*
+
+# Arquivos de Cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos de IDE (VS Code, etc)
+.vscode/

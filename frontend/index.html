@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskShift Portal | Orquestrador RPA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        body { background-color: #f4f6f9; }
+        .navbar-brand { font-weight: bold; letter-spacing: 1px; }
+        .card-header { font-weight: bold; background-color: #ffffff; }
+        .nav-tabs .nav-link.active { font-weight: bold; color: #0d6efd; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-dark bg-primary mb-4 shadow-sm">
+        <div class="container-fluid container">
+            <span class="navbar-brand mb-0 h1">⚙️ TaskShift Portal</span>
+            <span class="navbar-text text-light">Status: <span class="badge bg-success">Online</span></span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <ul class="nav nav-tabs mb-4" id="taskshiftTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="operar-tab" data-bs-toggle="tab" data-bs-target="#operar" type="button" role="tab">▶️ Operar & Monitorar</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="gestao-tab" data-bs-toggle="tab" data-bs-target="#gestao" type="button" role="tab">🛠️ Gestão de Robôs</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="agenda-tab" data-bs-toggle="tab" data-bs-target="#agenda" type="button">📅 Agendamentos</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="taskshiftTabsContent">
+            
+            <div class="tab-pane fade show active" id="operar" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header text-primary">🚀 Disparo Manual</div>
+                            <div class="card-body">
+                                <form id="playForm">
+                                    <div class="mb-3">
+                                        <label class="form-label">Robô</label>
+                                        <select class="form-select" id="robotSelect" required>
+                                            <option value="">Carregando...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Máquina (Worker)</label>
+                                        <select class="form-select" id="machineSelect" required>
+                                            <option value="">Carregando...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small">Parâmetros de Execução (JSON Opcional)</label>
+                                        <textarea class="form-control form-control-sm" id="executionParams" rows="3" placeholder='{"mes": "05/2026"}'></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Colocar na Fila (Play)</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-8">
+                        <div class="card shadow-sm">
+                            <div class="card-header text-primary">📋 Fila de Execução em Tempo Real</div>
+                            <div class="card-body p-0">
+                                <table class="table table-hover align-middle m-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-3">Status</th>
+                                            <th>Gatilho</th>
+                                            <th>Início</th>
+                                            <th class="pe-3 text-end">Ação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="queueTableBody">
+                                        <tr><td colspan="4" class="text-center text-muted py-3">Carregando fila...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="gestao" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header text-dark">➕ Cadastrar Robô</div>
+                            <div class="card-body">
+                                <form id="createRobotForm">
+                                    <div class="mb-3">
+                                        <label class="form-label">Nome do Robô</label>
+                                        <input type="text" class="form-control" id="newRobotName" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Caminho do Script (.py)</label>
+                                        <input type="text" class="form-control" id="newRobotPath" placeholder="robots/meu_robo.py" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100">Salvar Robô</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-8">
+                        <div class="card shadow-sm">
+                            <div class="card-header text-dark">🤖 Robôs Disponíveis</div>
+                            <div class="card-body p-0">
+                                <table class="table table-hover align-middle m-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-3">Nome do Robô</th>
+                                            <th>Caminho (Script)</th>
+                                            <th class="pe-3 text-end">Configurações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="robotsTableBody">
+                                        <tr><td colspan="3" class="text-center text-muted py-3">Carregando robôs...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="agenda" role="tabpanel">
+                <div class="row">
+                <div class="col-md-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header">Novo Agendamento</div>
+                        <div class="card-body">
+                            <form id="scheduleForm">
+                                <div class="mb-3">
+                                    <label class="form-label">Horário (HH:mm)</label>
+                                    <input type="time" class="form-control" id="schTime" required>
+                                </div>
+                                <button type="submit" class="btn btn-warning w-100">Agendar Robô</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header">Cronograma de Automações</div>
+                        <div class="card-body p-0">
+                            <table class="table m-0">
+                                <thead>
+                                    <tr>
+                                        <th>Robô</th>
+                                        <th>Hora</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="schedulesTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+</div>
+
+        </div> </div>
+
+    <script>
+        const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+
+        // ==========================================
+        // FUNÇÕES DA ABA 1 (OPERAR)
+        // ==========================================
+        async function carregarFila() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/executions/queue`);
+                const fila = await response.json();
+                const tbody = document.getElementById('queueTableBody');
+                tbody.innerHTML = '';
+
+                if (fila.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Nenhuma execução na fila ou rodando.</td></tr>';
+                    return;
+                }
+
+                fila.forEach(exec => {
+                    let badgeClass = exec.status === 'RUNNING' ? 'bg-primary' : 'bg-warning text-dark';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="ps-3"><span class="badge ${badgeClass}">${exec.status}</span></td>
+                            <td>${exec.trigger_type}</td>
+                            <td>${exec.start_time ? new Date(exec.start_time).toLocaleTimeString() : 'Aguardando...'}</td>
+                            <td class="pe-3 text-end">
+                                <button class="btn btn-sm btn-outline-danger" onclick="pararRobo('${exec.execution_id}')">Stop</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error("Erro ao carregar fila", error);
+            }
+        }
+
+        async function pararRobo(execution_id) {
+            if(confirm("Atenção: Deseja forçar a parada deste robô?")) {
+                try {
+                    await fetch(`${API_BASE_URL}/executions/${execution_id}/stop`, { method: 'POST' });
+                    carregarFila();
+                } catch(error) { console.error("Erro no Stop:", error); }
+            }
+        }
+
+        // ==========================================
+        // FUNÇÕES GLOBAIS (CARREGAR SELECTS E LISTAS)
+        // ==========================================
+        async function carregarMaquinas() {
+            const response = await fetch(`${API_BASE_URL}/machines`);
+            const maquinas = await response.json();
+            const select = document.getElementById('machineSelect');
+            select.innerHTML = '<option value="">-- Escolha a máquina --</option>';
+            maquinas.forEach(m => select.innerHTML += `<option value="${m.machine_id}">${m.hostname}</option>`);
+        }
+
+        async function carregarRobos() {
+            const response = await fetch(`${API_BASE_URL}/robots`);
+            const robos = await response.json();
+            
+            // Preenche o Select do Play
+            const select = document.getElementById('robotSelect');
+            select.innerHTML = '<option value="">-- Escolha o robô --</option>';
+            
+            // Preenche a Tabela da Aba Gestão
+            const tbody = document.getElementById('robotsTableBody');
+            tbody.innerHTML = '';
+
+            robos.forEach(r => {
+                select.innerHTML += `<option value="${r.robot_id}">${r.robot_name}</option>`;
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="ps-3 fw-bold">${r.robot_name}</td>
+                        <td class="text-muted small">${r.script_path}</td>
+                        <td class="pe-3 text-end">
+                            <button class="btn btn-sm btn-secondary" onclick="alert('Modal de Parâmetros virá na próxima etapa!')">⚙️ Parâmetros</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // ==========================================
+        // EVENT LISTENER (BOTÃO PLAY)
+        // ==========================================
+        document.getElementById('playForm').addEventListener('submit', async (event) => {
+            event.preventDefault(); 
+            const robot_id = document.getElementById('robotSelect').value;
+            const machine_id = document.getElementById('machineSelect').value;
+            // O campo JSON de execução pegaremos depois para enviar à API!
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/executions/play`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ robot_id, machine_id })
+                });
+                if (response.ok) carregarFila(); 
+            } catch (error) { console.error("Erro no Play", error); }
+        });
+
+        // Inicializa
+        window.onload = () => {
+            carregarMaquinas();
+            carregarRobos();
+            carregarFila();
+            setInterval(carregarFila, 3000); 
+        };
+    </script>
+</body>
+</html>
