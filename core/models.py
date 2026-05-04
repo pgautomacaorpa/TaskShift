@@ -1,6 +1,8 @@
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.sql import func
 from core.database import Base
+from typing import Optional, List
+
 
 class Machine(Base):
     __tablename__ = "TB_MACHINES"
@@ -56,6 +58,8 @@ class Schedule(Base):
     schedule_id = Column(String(36), primary_key=True)
     robot_id = Column(String(36), ForeignKey("TB_ROBOTS.robot_id"))
     machine_id = Column(String(36), ForeignKey("TB_MACHINES.machine_id"))
-    schedule_time = Column(String(5), nullable=False) # Guardaremos como "HH:mm"
+    schedule_time = Column(String(5), nullable=True) # Guardaremos como "HH:mm"
+    cron_expression = Column(String(100), nullable=True) # O novo formato avançado
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
+

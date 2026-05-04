@@ -68,11 +68,13 @@ class ScheduleCreate(BaseModel):
     robot_id: str
     machine_id: str
     schedule_time: str # Ex: "08:30"
+    cron_expression: Optional[str] = None
 
 class ScheduleResponse(BaseModel):
     schedule_id: str
     robot_id: str
     machine_id: str
     schedule_time: str
+    cron_expression: Optional[str] = None
     is_active: bool
     model_config = ConfigDict(from_attributes=True)

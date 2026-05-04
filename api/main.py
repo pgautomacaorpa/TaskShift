@@ -7,9 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from core.database import SessionLocal, get_db
+# IMPORTAÇÃO ATUALIZADA (Adicionamos o engine)
+from core.database import SessionLocal, get_db, engine 
 from core import models, schemas
 from apscheduler.schedulers.background import BackgroundScheduler
+from croniter import croniter
+
+# =======================================================
+# LINHA MÁGICA: Cria as tabelas que não existem no banco
+# Como você apagou a TB_SCHEDULES, o Python vai recriá-la!
+# =======================================================
+models.Base.metadata.create_all(bind=engine)
 
 # Cria a aplicação
 app = FastAPI(
@@ -17,60 +25,6 @@ app = FastAPI(
     description="API de Orquestração de Robôs Python",
     version="1.0.0"
 )
-
-# Criamos o motor de agendamento
-scheduler = BackgroundScheduler()
-
-# Função que o motor vai rodar a cada 1 minuto
-def check_scheduled_tasks():
-    db = SessionLocal()
-    agora = datetime.now().strftime("%H:%M")
-    print(f"[*] Verificando agendamentos para o horário: {agora}")
-    
-    # Busca agendamentos ativos para este minuto exato
-    schedules = db.query(models.Schedule).filter(
-        models.Schedule.schedule_time == agora,
-        models.Schedule.is_active == True
-    ).all()
-    
-    for s in schedules:
-        # Coloca o robô na fila (igual o botão Play faz)
-        new_exec = models.Execution(
-            execution_id=str(uuid.uuid4()),
-            robot_id=s.robot_id,
-            machine_id=s.machine_id,
-            trigger_type="SCHEDULED",
-            status="PENDING"
-        )
-        db.add(new_exec)
-        print(f"[!] Agendamento disparado: Robô {s.robot_id} na máquina {s.machine_id}")
-    
-    db.commit()
-    db.close()
-
-# Inicia o motor quando a API ligar
-@app.on_event("startup")
-def startup_event():
-    scheduler.add_job(check_scheduled_tasks, 'interval', minutes=1)
-    scheduler.start()
-
-# Rotas de CRUD para Agendamentos (Adicione ao final do main.py)
-@app.get("/api/v1/schedules", response_model=List[schemas.ScheduleResponse], tags=["Agendamentos"])
-def list_schedules(db: Session = Depends(get_db)):
-    return db.query(models.Schedule).all()
-
-@app.post("/api/v1/schedules", response_model=schemas.ScheduleResponse, tags=["Agendamentos"])
-def create_schedule(sch: schemas.ScheduleCreate, db: Session = Depends(get_db)):
-    new_sch = models.Schedule(
-        schedule_id=str(uuid.uuid4()),
-        robot_id=sch.robot_id,
-        machine_id=sch.machine_id,
-        schedule_time=sch.schedule_time
-    )
-    db.add(new_sch)
-    db.commit()
-    db.refresh(new_sch)
-    return new_sch
 
 # Libera o acesso do frontend para a API
 app.add_middleware(
@@ -81,6 +35,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ==========================================
+# MOTOR DE AGENDAMENTO (BACKGROUND)
+# ==========================================
+scheduler = BackgroundScheduler()
+
+def check_scheduled_tasks():
+    """Função que roda a cada minuto para checar agendamentos (CRON ou HH:mm)"""
+    db = SessionLocal()
+    agora = datetime.now()
+    agora_str = agora.strftime("%H:%M")
+    
+    # Busca todos os agendamentos ativos
+    schedules = db.query(models.Schedule).filter(models.Schedule.is_active == True).all()
+    
+    for s in schedules:
+        should_run = False
+        
+        # 1. Verifica pelo novo padrão Avançado (CRON)
+        if s.cron_expression and croniter.is_valid(s.cron_expression):
+            if croniter.match(s.cron_expression, agora):
+                should_run = True
+                
+        # 2. Mantém compatibilidade com o modelo antigo simples (HH:mm)
+        elif s.schedule_time == agora_str:
+            should_run = True
+            
+        # Se for a hora certa, coloca na fila de execução!
+        if should_run:
+            print(f"[CRON] Disparando Robô {s.robot_id} na Máquina {s.machine_id} às {agora_str}")
+            new_exec = models.Execution(
+                execution_id=str(uuid.uuid4()),
+                robot_id=s.robot_id,
+                machine_id=s.machine_id,
+                trigger_type="SCHEDULED",
+                status="PENDING"
+            )
+            db.add(new_exec)
+            
+    db.commit()
+    db.close()
+
+# Inicia o motor quando a API ligar
+@app.on_event("startup")
+def startup_event():
+    scheduler.add_job(check_scheduled_tasks, 'interval', minutes=1)
+    scheduler.start()
+
+# ==========================================
+# ROTAS DE SAÚDE E INFRAESTRUTURA
+# ==========================================
 @app.get("/")
 def read_root():
     return {"produto": "TaskShift", "status": "Online"}
@@ -93,17 +97,9 @@ def health_check(db: Session = Depends(get_db)):
     except Exception as e:
         return {"status": "Erro", "database": f"Falha na conexão: {str(e)}"}
 
-# ==========================================
-# ROTAS DE NEGÓCIO - TASKSHIFT
-# ==========================================
-
 @app.get("/api/v1/machines", response_model=List[schemas.MachineResponse], tags=["Infraestrutura"])
 def list_machines(db: Session = Depends(get_db)):
     return db.query(models.Machine).filter(models.Machine.is_active == True).all()
-
-@app.get("/api/v1/robots", response_model=List[schemas.RobotResponse], tags=["Robôs"])
-def list_robots(db: Session = Depends(get_db)):
-    return db.query(models.Robot).filter(models.Robot.is_active == True).all()
 
 @app.post("/api/v1/machines", response_model=schemas.MachineResponse, tags=["Infraestrutura"])
 def create_machine(machine: schemas.MachineCreate, db: Session = Depends(get_db)):
@@ -117,6 +113,13 @@ def create_machine(machine: schemas.MachineCreate, db: Session = Depends(get_db)
     db.refresh(new_machine)
     return new_machine
 
+# ==========================================
+# ROTAS DE ROBÔS E PARÂMETROS
+# ==========================================
+@app.get("/api/v1/robots", response_model=List[schemas.RobotResponse], tags=["Robôs"])
+def list_robots(db: Session = Depends(get_db)):
+    return db.query(models.Robot).filter(models.Robot.is_active == True).all()
+
 @app.post("/api/v1/robots", response_model=schemas.RobotResponse, tags=["Robôs"])
 def create_robot(robot: schemas.RobotCreate, db: Session = Depends(get_db)):
     new_robot = models.Robot(
@@ -129,6 +132,82 @@ def create_robot(robot: schemas.RobotCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_robot)
     return new_robot
+
+@app.get("/api/v1/robots/{robot_id}/parameters", response_model=List[schemas.ParameterResponse], tags=["Parâmetros"])
+def list_robot_parameters(robot_id: str, db: Session = Depends(get_db)):
+    return db.query(models.Parameter).filter(models.Parameter.robot_id == robot_id).all()
+
+@app.post("/api/v1/robots/{robot_id}/parameters", response_model=schemas.ParameterResponse, tags=["Parâmetros"])
+def create_robot_parameter(robot_id: str, param: schemas.ParameterCreate, db: Session = Depends(get_db)):
+    new_param = models.Parameter(
+        parameter_id=str(uuid.uuid4()),
+        robot_id=robot_id,
+        param_key=param.param_key,
+        param_value=param.param_value
+    )
+    db.add(new_param)
+    db.commit()
+    db.refresh(new_param)
+    return new_param
+
+@app.delete("/api/v1/parameters/{parameter_id}", tags=["Parâmetros"])
+def delete_parameter(parameter_id: str, db: Session = Depends(get_db)):
+    param = db.query(models.Parameter).filter(models.Parameter.parameter_id == parameter_id).first()
+    if not param:
+        raise HTTPException(status_code=404, detail="Parâmetro não encontrado.")
+    db.delete(param)
+    db.commit()
+    return {"message": "Parâmetro deletado com sucesso."}
+
+# ==========================================
+# ROTAS DE AGENDAMENTOS (SCHEDULES)
+# ==========================================
+@app.get("/api/v1/schedules", response_model=List[schemas.ScheduleResponse], tags=["Agendamentos"])
+def list_schedules(db: Session = Depends(get_db)):
+    return db.query(models.Schedule).all()
+
+@app.post("/api/v1/schedules", response_model=schemas.ScheduleResponse, tags=["Agendamentos"])
+def create_schedule(sch: schemas.ScheduleCreate, db: Session = Depends(get_db)):
+    new_sch = models.Schedule(
+        schedule_id=str(uuid.uuid4()),
+        robot_id=sch.robot_id,
+        machine_id=sch.machine_id,
+        schedule_time=sch.schedule_time,
+        cron_expression=sch.cron_expression
+    )
+    db.add(new_sch)
+    db.commit()
+    db.refresh(new_sch)
+    return new_sch
+
+@app.put("/api/v1/schedules/{schedule_id}/toggle", response_model=schemas.ScheduleResponse, tags=["Agendamentos"])
+def toggle_schedule(schedule_id: str, db: Session = Depends(get_db)):
+    schedule = db.query(models.Schedule).filter(models.Schedule.schedule_id == schedule_id).first()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
+    
+    schedule.is_active = not schedule.is_active # Inverte de Ativo para Pausado e vice-versa
+    db.commit()
+    db.refresh(schedule)
+    return schedule
+
+@app.delete("/api/v1/schedules/{schedule_id}", tags=["Agendamentos"])
+def delete_schedule(schedule_id: str, db: Session = Depends(get_db)):
+    schedule = db.query(models.Schedule).filter(models.Schedule.schedule_id == schedule_id).first()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
+    db.delete(schedule)
+    db.commit()
+    return {"message": "Agendamento deletado com sucesso."}
+
+# ==========================================
+# ROTAS DE EXECUÇÃO E FILA (QUEUE & PLAY)
+# ==========================================
+@app.get("/api/v1/executions/queue", response_model=List[schemas.ExecutionResponse], tags=["Execução e Fila"])
+def get_execution_queue(db: Session = Depends(get_db)):
+    return db.query(models.Execution).filter(
+        models.Execution.status.in_(["PENDING", "RUNNING"])
+    ).order_by(models.Execution.created_at.desc()).all()
 
 @app.post("/api/v1/executions/play", response_model=schemas.ExecutionResponse, tags=["Execução e Fila"])
 def play_robot(execution: schemas.ExecutionCreate, db: Session = Depends(get_db)):
@@ -144,10 +223,24 @@ def play_robot(execution: schemas.ExecutionCreate, db: Session = Depends(get_db)
     db.refresh(new_execution)
     return new_execution
 
-# ==========================================
-# ROTAS DO AGENTE (WORKER)
-# ==========================================
+@app.post("/api/v1/executions/{execution_id}/stop", tags=["Execução e Fila"])
+def stop_execution(execution_id: str, db: Session = Depends(get_db)):
+    execution = db.query(models.Execution).filter(models.Execution.execution_id == execution_id).first()
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execução não encontrada.")
+    
+    if execution.status in ["COMPLETED", "FAILED", "STOPPED"]:
+        raise HTTPException(status_code=400, detail="Esta execução já foi finalizada.")
+        
+    execution.status = "STOPPED"
+    execution.end_time = datetime.now()
+    db.commit()
+    db.refresh(execution)
+    return {"message": "Sinal de interrupção enviado.", "status": "STOPPED"}
 
+# ==========================================
+# ROTAS DO WORKER (AGENTES LOCAIS)
+# ==========================================
 @app.get("/api/v1/executions/next/{machine_id}", response_model=schemas.ExecutionResponse, tags=["Worker"])
 def get_next_execution(machine_id: str, db: Session = Depends(get_db)):
     next_task = db.query(models.Execution).filter(
@@ -157,7 +250,6 @@ def get_next_execution(machine_id: str, db: Session = Depends(get_db)):
     
     if not next_task:
         raise HTTPException(status_code=404, detail="Nenhuma tarefa na fila para esta máquina.")
-        
     return next_task
 
 @app.put("/api/v1/executions/{execution_id}/status", response_model=schemas.ExecutionResponse, tags=["Worker"])
@@ -184,60 +276,9 @@ def update_execution_status(execution_id: str, update_data: schemas.ExecutionUpd
     db.refresh(execution)
     return execution
 
-
-# ==========================================
-# ROTAS DO DASHBOARD (FRONTEND)
-# ==========================================
-
-@app.get("/api/v1/executions/queue", response_model=List[schemas.ExecutionResponse], tags=["Execução e Fila"])
-def get_execution_queue(db: Session = Depends(get_db)):
-    queue = db.query(models.Execution).filter(
-        models.Execution.status.in_(["PENDING", "RUNNING"])
-    ).order_by(models.Execution.created_at.desc()).all()
-    return queue
-
-@app.post("/api/v1/executions/{execution_id}/stop", tags=["Execução e Fila"])
-def stop_execution(execution_id: str, db: Session = Depends(get_db)):
-    execution = db.query(models.Execution).filter(models.Execution.execution_id == execution_id).first()
-    if not execution:
-        raise HTTPException(status_code=404, detail="Execução não encontrada.")
-    
-    if execution.status in ["COMPLETED", "FAILED", "STOPPED"]:
-        raise HTTPException(status_code=400, detail="Esta execução já foi finalizada.")
-        
-    execution.status = "STOPPED"
-    execution.end_time = datetime.now()
-    db.commit()
-    db.refresh(execution)
-    return {"message": "Sinal de interrupção enviado com sucesso.", "status": "STOPPED"}
-
-
 @app.get("/api/v1/executions/{execution_id}", response_model=schemas.ExecutionResponse, tags=["Worker"])
 def get_execution_status(execution_id: str, db: Session = Depends(get_db)):
     execution = db.query(models.Execution).filter(models.Execution.execution_id == execution_id).first()
     if not execution:
         raise HTTPException(status_code=404, detail="Execução não encontrada")
     return execution
-
-
-# ==========================================
-# ROTAS DE PARÂMETROS (CONFIGURAÇÃO)
-# ==========================================
-
-@app.get("/api/v1/robots/{robot_id}/parameters", response_model=List[schemas.ParameterResponse], tags=["Parâmetros"])
-def list_robot_parameters(robot_id: str, db: Session = Depends(get_db)):
-    parameters = db.query(models.Parameter).filter(models.Parameter.robot_id == robot_id).all()
-    return parameters
-
-@app.post("/api/v1/robots/{robot_id}/parameters", response_model=schemas.ParameterResponse, tags=["Parâmetros"])
-def create_robot_parameter(robot_id: str, param: schemas.ParameterCreate, db: Session = Depends(get_db)):
-    new_param = models.Parameter(
-        parameter_id=str(uuid.uuid4()),
-        robot_id=robot_id,
-        param_key=param.param_key,
-        param_value=param.param_value
-    )
-    db.add(new_param)
-    db.commit()
-    db.refresh(new_param)
-    return new_param
