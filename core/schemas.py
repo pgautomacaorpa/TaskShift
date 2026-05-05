@@ -40,9 +40,14 @@ class ExecutionResponse(BaseModel):
     machine_id: str
     trigger_type: str
     status: str
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    expected_items: Optional[int] = 0
+    processed_success: Optional[int] = 0
+    processed_errors: Optional[int] = 0
+    error_log: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
-
 # --- SCHEMA PARA O AGENTE ATUALIZAR O STATUS ---
 class ExecutionUpdate(BaseModel):
     status: str

@@ -57,6 +57,9 @@
             <li class="nav-item">
                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-cofre"><i class="bi bi-shield-lock me-2"></i>Vault</button>
             </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-historico"><i class="bi bi-clock-history me-2"></i>History</button>
+            </li>
         </ul>
 
         <div class="tab-content">
@@ -177,6 +180,7 @@
                                                 <th class="ps-4">Hostname</th>
                                                 <th>IP Address</th>
                                                 <th>Status</th>
+                                                <th class="text-end pe-4">Actions</th> </tr>
                                             </tr>
                                         </thead>
                                         <tbody id="machinesTableBody"></tbody>
@@ -308,6 +312,40 @@
                 </div>
             </div>
 
+            <div class="tab-pane fade" id="tab-historico">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Execution History (Last 20)</span>
+                        <div class="d-flex align-items-center">
+                            <label class="me-2 small text-muted mb-0">Filter:</label>
+                            <select class="form-select form-select-sm w-auto" id="historyRobotFilter" onchange="carregarHistorico()">
+                                <option value="">All Robots</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-secondary ms-2" onclick="carregarHistorico()"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="ps-4">Status</th>
+                                        <th>Robot Name</th>
+                                        <th>Target Machine</th>
+                                        <th>Start Time</th>
+                                        <th>Duration</th>
+                                        <th class="text-end pe-4">Logs</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTableBody">
+                                    <tr><td colspan="6" class="text-center py-5 text-muted">Loading history...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -387,12 +425,15 @@
                     machSelects.forEach(s => s.innerHTML += `<option value="${m.machine_id}">${m.hostname}</option>`);
                     machineTable.innerHTML += `
                         <tr>
-                          <td class="ps-4 fw-bold text-dark">
+                        <td class="ps-4 fw-bold text-dark">
                             <i class="bi bi-pc-display me-2 text-secondary"></i>${m.hostname}<br>
                             <small class="text-muted fw-normal" style="font-size: 11px;">ID: ${m.machine_id}</small>
-                         </td>
+                        </td>
                         <td class="text-muted">${m.ip_address || '-'}</td>
                         <td><span class="badge bg-success-soft">Active</span></td>
+                        <td class="text-end pe-4">
+                            <button class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="deletarMaquina('${m.machine_id}')" title="Delete Machine"><i class="bi bi-trash3"></i></button>
+                        </td>
                         </tr>`;
                 });
 
@@ -402,13 +443,14 @@
                     mapaRobos[r.robot_id] = r.robot_name;
                     roboSelects.forEach(s => s.innerHTML += `<option value="${r.robot_id}">${r.robot_name}</option>`);
                     robotTable.innerHTML += `
-                        <tr>
-                            <td class="ps-4 fw-bold text-dark">${r.robot_name}</td>
-                            <td class="text-muted" style="font-size: 0.85rem;"><i class="bi bi-file-earmark-code me-1"></i>${r.script_path}</td>
-                            <td class="text-end pe-4">
-                                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="abrirModalParametros('${r.robot_id}', '${r.robot_name}')"><i class="bi bi-gear-fill me-1"></i> Params</button>
-                            </td>
-                        </tr>`;
+                            <tr>
+                                <td class="ps-4 fw-bold text-dark">${r.robot_name}</td>
+                                <td class="text-muted" style="font-size: 0.85rem;"><i class="bi bi-file-earmark-code me-1"></i>${r.script_path}</td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 me-1" onclick="abrirModalParametros('${r.robot_id}', '${r.robot_name}')"><i class="bi bi-gear-fill me-1"></i> Params</button>
+                                    <button class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="deletarRobo('${r.robot_id}')" title="Delete Robot"><i class="bi bi-trash3"></i></button>
+                                </td>
+                            </tr>`;
                 });
             } catch (e) { console.error("Erro ao carregar bases:", e); }
         }
@@ -739,6 +781,101 @@
                 carregarCofre();
             } catch (err) { console.error(err); }
         });
+
+    async function deletarRobo(id) {
+    if(confirm("Are you sure you want to remove this robot?")) {
+        await fetch(`${API_BASE_URL}/robots/${id}`, { method: 'DELETE' });
+        carregarDadosIniciais(); // Recarrega as tabelas e listas suspensas instantaneamente
+        }
+    }
+
+    async function deletarMaquina(id) {
+        if(confirm("Are you sure you want to remove this machine?")) {
+            await fetch(`${API_BASE_URL}/machines/${id}`, { method: 'DELETE' });
+            carregarDadosIniciais(); // Recarrega as tabelas e listas suspensas instantaneamente
+        }
+    }
+
+    // ------------------------------------------
+        // LÓGICA DO HISTÓRICO
+        // ------------------------------------------
+        async function carregarHistorico() {
+            const robotId = document.getElementById('historyRobotFilter').value;
+            const url = robotId ? `${API_BASE_URL}/executions/history?robot_id=${robotId}` : `${API_BASE_URL}/executions/history`;
+            
+            try {
+                const response = await fetch(url);
+                const history = await response.json();
+                const tbody = document.getElementById('historyTableBody');
+                tbody.innerHTML = '';
+
+                if (history.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">No execution history found.</td></tr>';
+                    return;
+                }
+
+                history.forEach(exec => {
+                    let badgeClass = 'bg-success-soft';
+                    let icon = '<i class="bi bi-check-circle me-1"></i>';
+                    
+                    if (exec.status === 'FAILED') {
+                        badgeClass = 'bg-danger-soft border-danger text-danger';
+                        icon = '<i class="bi bi-x-circle me-1"></i>';
+                    } else if (exec.status === 'STOPPED') {
+                        badgeClass = 'bg-warning-soft';
+                        icon = '<i class="bi bi-slash-circle me-1"></i>';
+                    }
+
+                    const nomeRobo = mapaRobos[exec.robot_id] || "Unknown";
+                    const nomeMaquina = mapaMaquinas[exec.machine_id] || "Unknown";
+                    
+                    // Cálculo simples de duração
+                    let duration = "--";
+                    if(exec.start_time && exec.end_time) {
+                        const diffSecs = Math.round((new Date(exec.end_time) - new Date(exec.start_time)) / 1000);
+                        duration = `${diffSecs}s`;
+                    }
+
+                    const inicio = exec.start_time ? new Date(exec.start_time).toLocaleString() : '--/--/---- --:--';
+                    
+                    // Botão de Logs
+                    let logBtn = `<button class="btn btn-sm btn-light text-muted" disabled><i class="bi bi-journal-text"></i></button>`;
+                    if(exec.error_log) {
+                        // Limpa as aspas para não quebrar o HTML do onclick
+                        const safeLog = exec.error_log.replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, "\\n");
+                        logBtn = `<button class="btn btn-sm btn-outline-danger" onclick="alert('LOG DE ERRO:\\n\\n${safeLog}')"><i class="bi bi-journal-x"></i> View Error</button>`;
+                    }
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="ps-4"><span class="badge ${badgeClass}">${icon}${exec.status}</span></td>
+                            <td class="fw-bold text-dark">${nomeRobo}</td>
+                            <td><span class="badge bg-secondary-soft"><i class="bi bi-pc-display me-1"></i>${nomeMaquina}</span></td>
+                            <td class="text-muted" style="font-size: 0.85rem;">${inicio}</td>
+                            <td><span class="badge bg-light text-dark border"><i class="bi bi-stopwatch me-1"></i>${duration}</span></td>
+                            <td class="text-end pe-4">${logBtn}</td>
+                        </tr>
+                    `;
+                });
+            } catch (e) { console.error("Erro no histórico:", e); }
+        }
+
+        // ⚠️ IMPORTANTE: Atualize o seu window.onload atual para chamar o carregarHistorico() e atualizar o dropdown do filtro:
+        window.onload = async () => {
+            await carregarDadosIniciais();
+            
+            // Popula o Dropdown do filtro de histórico com os robôs existentes
+            const histFilter = document.getElementById('historyRobotFilter');
+            Object.keys(mapaRobos).forEach(id => {
+                histFilter.innerHTML += `<option value="${id}">${mapaRobos[id]}</option>`;
+            });
+
+            carregarFila();
+            carregarAgendamentos();
+            carregarCofre();
+            carregarHistorico(); // Chama o histórico na inicialização
+            setInterval(carregarFila, 3000);
+        };
 
         // ------------------------------------------
         // INICIALIZAÇÃO DA PÁGINA

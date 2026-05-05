@@ -161,6 +161,26 @@ def delete_parameter(parameter_id: str, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Parâmetro deletado com sucesso."}
 
+
+@app.delete("/api/v1/machines/{machine_id}", tags=["Infraestrutura"])
+def delete_machine(machine_id: str, db: Session = Depends(get_db)):
+    """Desativa uma máquina para ela não aparecer mais no painel"""
+    machine = db.query(models.Machine).filter(models.Machine.machine_id == machine_id).first()
+    if not machine:
+        raise HTTPException(status_code=404, detail="Máquina não encontrada.")
+    machine.is_active = False # Soft Delete
+    db.commit()
+    return {"message": "Máquina removida com sucesso."}
+
+@app.delete("/api/v1/robots/{robot_id}", tags=["Robôs"])
+def delete_robot(robot_id: str, db: Session = Depends(get_db)):
+    """Desativa um robô para ele não aparecer mais no painel"""
+    robot = db.query(models.Robot).filter(models.Robot.robot_id == robot_id).first()
+    if not robot:
+        raise HTTPException(status_code=404, detail="Robô não encontrado.")
+    robot.is_active = False # Soft Delete
+    db.commit()
+    return {"message": "Robô removido com sucesso."}
 # ==========================================
 # ROTAS DE AGENDAMENTOS (SCHEDULES)
 # ==========================================
@@ -225,6 +245,18 @@ def play_robot(execution: schemas.ExecutionCreate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(new_execution)
     return new_execution
+
+@app.get("/api/v1/executions/history", response_model=List[schemas.ExecutionResponse], tags=["Execução e Fila"])
+def get_execution_history(robot_id: str = None, limit: int = 20, db: Session = Depends(get_db)):
+    """Retorna o histórico das últimas execuções finalizadas, com filtro opcional por robô."""
+    query = db.query(models.Execution).filter(
+        models.Execution.status.in_(["COMPLETED", "FAILED", "STOPPED"])
+    )
+    
+    if robot_id:
+        query = query.filter(models.Execution.robot_id == robot_id)
+        
+    return query.order_by(models.Execution.created_at.desc()).limit(limit).all()
 
 @app.post("/api/v1/executions/{execution_id}/stop", tags=["Execução e Fila"])
 def stop_execution(execution_id: str, db: Session = Depends(get_db)):
