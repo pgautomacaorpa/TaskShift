@@ -106,7 +106,8 @@ def create_machine(machine: schemas.MachineCreate, db: Session = Depends(get_db)
     new_machine = models.Machine(
         machine_id=str(uuid.uuid4()),
         hostname=machine.hostname,
-        ip_address=machine.ip_address
+        ip_address=machine.ip_address,
+        is_active=True
     )
     db.add(new_machine)
     db.commit()
@@ -126,7 +127,8 @@ def create_robot(robot: schemas.RobotCreate, db: Session = Depends(get_db)):
         robot_id=str(uuid.uuid4()),
         robot_name=robot.robot_name,
         script_path=robot.script_path,
-        description=robot.description
+        description=robot.description,
+        is_active=True
     )
     db.add(new_robot)
     db.commit()
@@ -173,7 +175,8 @@ def create_schedule(sch: schemas.ScheduleCreate, db: Session = Depends(get_db)):
         robot_id=sch.robot_id,
         machine_id=sch.machine_id,
         schedule_time=sch.schedule_time,
-        cron_expression=sch.cron_expression
+        cron_expression=sch.cron_expression,
+        is_active=True
     )
     db.add(new_sch)
     db.commit()
@@ -282,3 +285,39 @@ def get_execution_status(execution_id: str, db: Session = Depends(get_db)):
     if not execution:
         raise HTTPException(status_code=404, detail="Execução não encontrada")
     return execution
+
+# ==========================================
+# ROTAS DO COFRE DE CREDENCIAIS (VAULT)
+# ==========================================
+@app.get("/api/v1/credentials", response_model=List[schemas.CredentialResponse], tags=["Cofre"])
+def list_credentials(db: Session = Depends(get_db)):
+    """Lista todas as credenciais (sem expor as senhas)."""
+    return db.query(models.Credential).all()
+
+@app.post("/api/v1/credentials", response_model=schemas.CredentialResponse, tags=["Cofre"])
+def create_credential(cred: schemas.CredentialCreate, db: Session = Depends(get_db)):
+    """Salva uma nova credencial no cofre."""
+    # Verifica se já existe uma credencial com esse nome
+    if db.query(models.Credential).filter(models.Credential.credential_name == cred.credential_name).first():
+        raise HTTPException(status_code=400, detail="Já existe uma credencial com este nome.")
+        
+    new_cred = models.Credential(
+        credential_id=str(uuid.uuid4()),
+        credential_name=cred.credential_name,
+        username=cred.username,
+        password_secret=cred.password_secret
+    )
+    db.add(new_cred)
+    db.commit()
+    db.refresh(new_cred)
+    return new_cred
+
+@app.delete("/api/v1/credentials/{credential_id}", tags=["Cofre"])
+def delete_credential(credential_id: str, db: Session = Depends(get_db)):
+    """Remove uma credencial do cofre."""
+    cred = db.query(models.Credential).filter(models.Credential.credential_id == credential_id).first()
+    if not cred:
+        raise HTTPException(status_code=404, detail="Credencial não encontrada.")
+    db.delete(cred)
+    db.commit()
+    return {"message": "Credencial removida com sucesso."}

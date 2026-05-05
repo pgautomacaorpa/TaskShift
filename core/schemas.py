@@ -74,7 +74,20 @@ class ScheduleResponse(BaseModel):
     schedule_id: str
     robot_id: str
     machine_id: str
-    schedule_time: str
+    schedule_time: Optional[str] = None
     cron_expression: Optional[str] = None
     is_active: bool
+    model_config = ConfigDict(from_attributes=True)
+
+# --- SCHEMAS PARA O COFRE DE CREDENCIAIS ---
+class CredentialCreate(BaseModel):
+    credential_name: str
+    username: Optional[str] = None
+    password_secret: str
+
+class CredentialResponse(BaseModel):
+    credential_id: str
+    credential_name: str
+    username: Optional[str] = None
+    # NOTA DE SEGURANÇA: Nunca retornamos o password_secret na resposta da API para o Dashboard!
     model_config = ConfigDict(from_attributes=True)

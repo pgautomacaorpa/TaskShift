@@ -63,3 +63,12 @@ class Schedule(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
 
+
+class Credential(Base):
+    __tablename__ = "TB_CREDENTIALS"
+
+    credential_id = Column(String(36), primary_key=True)
+    credential_name = Column(String(100), unique=True, nullable=False) # Ex: "sap_login_financeiro"
+    username = Column(String(100), nullable=True)
+    password_secret = Column(String(500), nullable=False) # Em produção usaríamos criptografia aqui
+    created_at = Column(DateTime, default=func.now())
