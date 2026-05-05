@@ -8,6 +8,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
         body { background-color: #f8fafc; font-family: 'Inter', sans-serif; color: #334155; }
         .navbar { background-color: #0f172a !important; padding: 1rem 0; }
@@ -25,6 +27,7 @@
         .bg-primary-soft { background-color: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
         .bg-success-soft { background-color: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
         .bg-warning-soft { background-color: #fefce8; color: #ca8a04; border: 1px solid #fef08a; }
+        .bg-danger-soft { background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
         .bg-secondary-soft { background-color: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
         .form-control, .form-select { border-radius: 8px; border-color: #cbd5e1; padding: 0.6rem 1rem; font-size: 0.9rem; }
         .form-control:focus, .form-select:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
@@ -58,7 +61,7 @@
                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-cofre"><i class="bi bi-shield-lock me-2"></i>Vault</button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-historico"><i class="bi bi-clock-history me-2"></i>History</button>
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-historico"><i class="bi bi-bar-chart-fill me-2"></i>Dashboard & History</button>
             </li>
         </ul>
 
@@ -180,7 +183,7 @@
                                                 <th class="ps-4">Hostname</th>
                                                 <th>IP Address</th>
                                                 <th>Status</th>
-                                                <th class="text-end pe-4">Actions</th> </tr>
+                                                <th class="text-end pe-4">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody id="machinesTableBody"></tbody>
@@ -313,37 +316,66 @@
             </div>
 
             <div class="tab-pane fade" id="tab-historico">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>Execution History (Last 20)</span>
-                        <div class="d-flex align-items-center">
-                            <label class="me-2 small text-muted mb-0">Filter:</label>
-                            <select class="form-select form-select-sm w-auto" id="historyRobotFilter" onchange="carregarHistorico()">
-                                <option value="">All Robots</option>
-                            </select>
-                            <button class="btn btn-sm btn-outline-secondary ms-2" onclick="carregarHistorico()"><i class="bi bi-arrow-clockwise"></i></button>
+                
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Execution History (Last 20)</span>
+                                <div class="d-flex align-items-center">
+                                    <label class="me-2 small text-muted mb-0">Filter:</label>
+                                    <select class="form-select form-select-sm w-auto" id="historyRobotFilter" onchange="carregarHistorico()">
+                                        <option value="">All Robots</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-outline-secondary ms-2" onclick="carregarHistorico()"><i class="bi bi-arrow-clockwise"></i></button>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive" style="max-height: 450px;">
+                                    <table class="table table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th class="ps-4">Status</th>
+                                                <th>Robot Name</th>
+                                                <th>Time</th>
+                                                <th>Duration</th>
+                                                <th>Items (Ok / Err)</th>
+                                                <th class="text-end pe-4">Logs</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="historyTableBody">
+                                            <tr><td colspan="6" class="text-center py-5 text-muted">Loading history...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead>
-                                    <tr>
-                                        <th class="ps-4">Status</th>
-                                        <th>Robot Name</th>
-                                        <th>Target Machine</th>
-                                        <th>Start Time</th>
-                                        <th>Duration</th>
-                                        <th class="text-end pe-4">Logs</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="historyTableBody">
-                                    <tr><td colspan="6" class="text-center py-5 text-muted">Loading history...</td></tr>
-                                </tbody>
-                            </table>
+                    
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header border-top border-primary border-3">
+                                Processed Items Metrics
+                            </div>
+                            <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                                <div style="position: relative; height:200px; width:100%;">
+                                    <canvas id="metricsChart"></canvas>
+                                </div>
+                                <div class="mt-4 text-center w-100">
+                                    <div class="row text-muted small fw-bold text-uppercase">
+                                        <div class="col-6"><i class="bi bi-check-circle-fill text-success me-1"></i> Success</div>
+                                        <div class="col-6"><i class="bi bi-x-circle-fill text-danger me-1"></i> Errors</div>
+                                    </div>
+                                    <div class="row fs-4 fw-bold">
+                                        <div class="col-6 text-success" id="metricSuccess">0</div>
+                                        <div class="col-6 text-danger" id="metricErrors">0</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+
             </div>
 
         </div>
@@ -393,6 +425,7 @@
         let mapaMaquinas = {};
         let mapaRobos = {};
         let roboSelecionadoParaConfig = null;
+        let chartInstance = null; // Variável para armazenar o gráfico
 
         document.addEventListener("DOMContentLoaded", function() {
             const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -439,9 +472,16 @@
 
                 const robotTable = document.getElementById('robotsTableBody');
                 robotTable.innerHTML = '';
+                
+                // Limpa e repopula o Dropdown do filtro de histórico com os robôs existentes
+                const histFilter = document.getElementById('historyRobotFilter');
+                histFilter.innerHTML = '<option value="">All Robots</option>';
+
                 robos.forEach(r => {
                     mapaRobos[r.robot_id] = r.robot_name;
                     roboSelects.forEach(s => s.innerHTML += `<option value="${r.robot_id}">${r.robot_name}</option>`);
+                    histFilter.innerHTML += `<option value="${r.robot_id}">${r.robot_name}</option>`;
+                    
                     robotTable.innerHTML += `
                             <tr>
                                 <td class="ps-4 fw-bold text-dark">${r.robot_name}</td>
@@ -582,28 +622,21 @@
         }
 
         function parseCronToText(cronExp) {
-            // Se estiver vazio ou for nulo, retorna padrão
             if (!cronExp) return `<span class="badge bg-secondary-soft"><i class="bi bi-clock me-1"></i> --:--</span>`; 
-            
-            // Se não tiver espaço, é o formato antigo simples "HH:mm"
             if (!cronExp.includes(' ')) return `<span class="badge bg-secondary-soft"><i class="bi bi-clock me-1"></i> ${cronExp}</span>`; 
             
-            // Divide o CRON em array: [minuto, hora, dia_mes, mes, dia_semana]
             const parts = cronExp.split(' ');
-            
-            // Prevenção de erro
             if (parts.length < 5) return `<span class="badge bg-secondary-soft"><i class="bi bi-clock me-1"></i> ${cronExp}</span>`;
 
-            // Garante que está lendo a string correta
-            const min = String(parts[0]).padStart(2, '0');
-            const hr = String(parts[1]).padStart(2, '0');
+            const min = String(parts).padStart(2, '0');
+            const hr = String(parts).padStart(2, '0');
             const time = `${hr}:${min}`;
             
-            if(parts[4] === '*') return `<span class="badge bg-success-soft"><i class="bi bi-calendar-check me-1"></i> Everyday, ${time}</span>`;
-            if(parts[4] === '1-5') return `<span class="badge bg-primary-soft"><i class="bi bi-briefcase me-1"></i> Weekdays, ${time}</span>`;
+            if(parts === '*') return `<span class="badge bg-success-soft"><i class="bi bi-calendar-check me-1"></i> Everyday, ${time}</span>`;
+            if(parts === '1-5') return `<span class="badge bg-primary-soft"><i class="bi bi-briefcase me-1"></i> Weekdays, ${time}</span>`;
             
             const dayMap = {'0':'Sun','1':'Mon','2':'Tue','3':'Wed','4':'Thu','5':'Fri','6':'Sat'};
-            const daysArr = parts[4].split(',').map(d => dayMap[d] || d).join(', ');
+            const daysArr = parts.split(',').map(d => dayMap[d] || d).join(', ');
             
             return `<span class="badge bg-secondary-soft"><i class="bi bi-calendar3 me-1"></i> ${daysArr} at ${time}</span>`;
         }
@@ -657,7 +690,7 @@
         }
 
         // ------------------------------------------
-        // VAULT (COFRE DE CREDENCIAIS)
+        // VAULT E ROTAS DE MANEJO
         // ------------------------------------------
         async function carregarCofre() {
             try {
@@ -696,8 +729,143 @@
             }
         }
 
+        async function deletarRobo(id) {
+            if(confirm("Are you sure you want to remove this robot?")) {
+                await fetch(`${API_BASE_URL}/robots/${id}`, { method: 'DELETE' });
+                carregarDadosIniciais(); 
+            }
+        }
+
+        async function deletarMaquina(id) {
+            if(confirm("Are you sure you want to remove this machine?")) {
+                await fetch(`${API_BASE_URL}/machines/${id}`, { method: 'DELETE' });
+                carregarDadosIniciais(); 
+            }
+        }
+
         // ------------------------------------------
-        // EVENT LISTENERS DOS FORMULÁRIOS
+        // LÓGICA DO HISTÓRICO E GRÁFICOS (NOVO)
+        // ------------------------------------------
+        
+        function renderizarGrafico(sucesso, erros) {
+            const ctx = document.getElementById('metricsChart').getContext('2d');
+            
+            // Destrói o gráfico antigo se o filtro mudar para não sobrepor
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            // Se os dois forem zero, mostra cinza
+            const isVazio = (sucesso === 0 && erros === 0);
+            
+            // AQUI ESTÁ A CORREÇÃO: O '' estava faltando na condição verdadeira do ternário
+            const dataValores = isVazio ? '' : [sucesso, erros];
+            
+            const cores = isVazio ? ['#e2e8f0'] : ['#16a34a', '#dc2626'];
+            const legendas = isVazio ? ['No data'] : ['Success', 'Errors'];
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: legendas,
+                    datasets: [{
+                        data: dataValores,
+                        backgroundColor: cores,
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%', // Deixa o buraco da rosca maior
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: !isVazio }
+                    }
+                }
+            });
+        }
+
+        async function carregarHistorico() {
+            const robotId = document.getElementById('historyRobotFilter').value;
+            const url = robotId ? `${API_BASE_URL}/executions/history?robot_id=${robotId}` : `${API_BASE_URL}/executions/history`;
+            
+            try {
+                const response = await fetch(url);
+                const history = await response.json();
+                const tbody = document.getElementById('historyTableBody');
+                tbody.innerHTML = '';
+
+                // Variáveis para somar no Gráfico
+                let totalSuccess = 0;
+                let totalErrors = 0;
+
+                if (history.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">No execution history found.</td></tr>';
+                    document.getElementById('metricSuccess').innerText = "0";
+                    document.getElementById('metricErrors').innerText = "0";
+                    renderizarGrafico(0, 0);
+                    return;
+                }
+
+                history.forEach(exec => {
+                    // Contabilizando para o gráfico
+                    totalSuccess += (exec.processed_success || 0);
+                    totalErrors += (exec.processed_errors || 0);
+
+                    let badgeClass = 'bg-success-soft';
+                    let icon = '<i class="bi bi-check-circle me-1"></i>';
+                    
+                    if (exec.status === 'FAILED') {
+                        badgeClass = 'bg-danger-soft border-danger text-danger';
+                        icon = '<i class="bi bi-x-circle me-1"></i>';
+                    } else if (exec.status === 'STOPPED') {
+                        badgeClass = 'bg-warning-soft';
+                        icon = '<i class="bi bi-slash-circle me-1"></i>';
+                    }
+
+                    const nomeRobo = mapaRobos[exec.robot_id] || "Unknown";
+                    
+                    let duration = "--";
+                    if(exec.start_time && exec.end_time) {
+                        const diffSecs = Math.round((new Date(exec.end_time) - new Date(exec.start_time)) / 1000);
+                        duration = `${diffSecs}s`;
+                    }
+
+                    const hora = exec.start_time ? new Date(exec.start_time).toLocaleTimeString() : '--:--:--';
+                    
+                    // A Nova Coluna de Itens (Sucesso / Erros)
+                    const itensFormatados = `<span class="text-success fw-bold">${exec.processed_success || 0}</span> <span class="text-muted mx-1">/</span> <span class="text-danger fw-bold">${exec.processed_errors || 0}</span>`;
+                    
+                    let logBtn = `<button class="btn btn-sm btn-light text-muted" disabled><i class="bi bi-journal-text"></i></button>`;
+                    if(exec.error_log) {
+                        const safeLog = exec.error_log.replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, "\\n");
+                        logBtn = `<button class="btn btn-sm btn-outline-danger" onclick="alert('LOG DE ERRO:\\n\\n${safeLog}')"><i class="bi bi-journal-x"></i> View Log</button>`;
+                    }
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="ps-4"><span class="badge ${badgeClass}">${icon}${exec.status}</span></td>
+                            <td class="fw-bold text-dark">${nomeRobo}</td>
+                            <td class="text-muted" style="font-size: 0.85rem;">${hora}</td>
+                            <td><span class="badge bg-light text-dark border"><i class="bi bi-stopwatch me-1"></i>${duration}</span></td>
+                            <td style="font-size: 0.95rem;">${itensFormatados}</td>
+                            <td class="text-end pe-4">${logBtn}</td>
+                        </tr>
+                    `;
+                });
+
+                // Atualiza os valores do painel e recria o gráfico
+                document.getElementById('metricSuccess').innerText = totalSuccess;
+                document.getElementById('metricErrors').innerText = totalErrors;
+                renderizarGrafico(totalSuccess, totalErrors);
+
+            } catch (e) { console.error("Erro no histórico:", e); }
+        }
+
+        // ------------------------------------------
+        // EVENT LISTENERS DE FORMULÁRIOS
         // ------------------------------------------
         document.getElementById('playForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -706,31 +874,23 @@
             carregarFila();
         });
 
-        // FORMULÁRIO: CADASTRAR ROBÔ
         document.getElementById('createRobotForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const payload = {
-                robot_name: document.getElementById('newRobotName').value.trim(),
-                script_path: document.getElementById('newRobotPath').value.trim()
-            };
+            const payload = { robot_name: document.getElementById('newRobotName').value.trim(), script_path: document.getElementById('newRobotPath').value.trim() };
             try {
                 await fetch(`${API_BASE_URL}/robots`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 document.getElementById('createRobotForm').reset();
-                carregarDadosIniciais(); // Recarrega tabelas e selects
+                carregarDadosIniciais(); 
             } catch (err) { console.error(err); }
         });
 
-        // FORMULÁRIO: CADASTRAR MÁQUINA
         document.getElementById('createMachineForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const payload = {
-                hostname: document.getElementById('newMachineName').value.trim(),
-                ip_address: document.getElementById('newMachineIP').value.trim() || null
-            };
+            const payload = { hostname: document.getElementById('newMachineName').value.trim(), ip_address: document.getElementById('newMachineIP').value.trim() || null };
             try {
                 await fetch(`${API_BASE_URL}/machines`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 document.getElementById('createMachineForm').reset();
-                carregarDadosIniciais(); // Recarrega tabelas e selects
+                carregarDadosIniciais();
             } catch (err) { console.error(err); }
         });
 
@@ -749,12 +909,7 @@
                 cronStr = `${min} ${hour} * * ${checkedDays}`;
             }
 
-            const payload = { 
-                robot_id: document.getElementById('schRobotSelect').value, 
-                machine_id: document.getElementById('schMachineSelect').value,
-                cron_expression: cronStr, 
-                schedule_time: timeVal 
-            };
+            const payload = { robot_id: document.getElementById('schRobotSelect').value, machine_id: document.getElementById('schMachineSelect').value, cron_expression: cronStr, schedule_time: timeVal };
             try {
                 await fetch(`${API_BASE_URL}/schedules`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 document.getElementById('scheduleForm').reset();
@@ -766,11 +921,7 @@
 
         document.getElementById('vaultForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const payload = {
-                credential_name: document.getElementById('credName').value.trim(),
-                username: document.getElementById('credUser').value.trim() || null,
-                password_secret: document.getElementById('credPass').value
-            };
+            const payload = { credential_name: document.getElementById('credName').value.trim(), username: document.getElementById('credUser').value.trim() || null, password_secret: document.getElementById('credPass').value };
             try {
                 const res = await fetch(`${API_BASE_URL}/credentials`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 if(!res.ok) {
@@ -782,109 +933,17 @@
             } catch (err) { console.error(err); }
         });
 
-    async function deletarRobo(id) {
-    if(confirm("Are you sure you want to remove this robot?")) {
-        await fetch(`${API_BASE_URL}/robots/${id}`, { method: 'DELETE' });
-        carregarDadosIniciais(); // Recarrega as tabelas e listas suspensas instantaneamente
-        }
-    }
-
-    async function deletarMaquina(id) {
-        if(confirm("Are you sure you want to remove this machine?")) {
-            await fetch(`${API_BASE_URL}/machines/${id}`, { method: 'DELETE' });
-            carregarDadosIniciais(); // Recarrega as tabelas e listas suspensas instantaneamente
-        }
-    }
-
-    // ------------------------------------------
-        // LÓGICA DO HISTÓRICO
         // ------------------------------------------
-        async function carregarHistorico() {
-            const robotId = document.getElementById('historyRobotFilter').value;
-            const url = robotId ? `${API_BASE_URL}/executions/history?robot_id=${robotId}` : `${API_BASE_URL}/executions/history`;
-            
-            try {
-                const response = await fetch(url);
-                const history = await response.json();
-                const tbody = document.getElementById('historyTableBody');
-                tbody.innerHTML = '';
-
-                if (history.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">No execution history found.</td></tr>';
-                    return;
-                }
-
-                history.forEach(exec => {
-                    let badgeClass = 'bg-success-soft';
-                    let icon = '<i class="bi bi-check-circle me-1"></i>';
-                    
-                    if (exec.status === 'FAILED') {
-                        badgeClass = 'bg-danger-soft border-danger text-danger';
-                        icon = '<i class="bi bi-x-circle me-1"></i>';
-                    } else if (exec.status === 'STOPPED') {
-                        badgeClass = 'bg-warning-soft';
-                        icon = '<i class="bi bi-slash-circle me-1"></i>';
-                    }
-
-                    const nomeRobo = mapaRobos[exec.robot_id] || "Unknown";
-                    const nomeMaquina = mapaMaquinas[exec.machine_id] || "Unknown";
-                    
-                    // Cálculo simples de duração
-                    let duration = "--";
-                    if(exec.start_time && exec.end_time) {
-                        const diffSecs = Math.round((new Date(exec.end_time) - new Date(exec.start_time)) / 1000);
-                        duration = `${diffSecs}s`;
-                    }
-
-                    const inicio = exec.start_time ? new Date(exec.start_time).toLocaleString() : '--/--/---- --:--';
-                    
-                    // Botão de Logs
-                    let logBtn = `<button class="btn btn-sm btn-light text-muted" disabled><i class="bi bi-journal-text"></i></button>`;
-                    if(exec.error_log) {
-                        // Limpa as aspas para não quebrar o HTML do onclick
-                        const safeLog = exec.error_log.replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, "\\n");
-                        logBtn = `<button class="btn btn-sm btn-outline-danger" onclick="alert('LOG DE ERRO:\\n\\n${safeLog}')"><i class="bi bi-journal-x"></i> View Error</button>`;
-                    }
-
-                    tbody.innerHTML += `
-                        <tr>
-                            <td class="ps-4"><span class="badge ${badgeClass}">${icon}${exec.status}</span></td>
-                            <td class="fw-bold text-dark">${nomeRobo}</td>
-                            <td><span class="badge bg-secondary-soft"><i class="bi bi-pc-display me-1"></i>${nomeMaquina}</span></td>
-                            <td class="text-muted" style="font-size: 0.85rem;">${inicio}</td>
-                            <td><span class="badge bg-light text-dark border"><i class="bi bi-stopwatch me-1"></i>${duration}</span></td>
-                            <td class="text-end pe-4">${logBtn}</td>
-                        </tr>
-                    `;
-                });
-            } catch (e) { console.error("Erro no histórico:", e); }
-        }
-
-        // ⚠️ IMPORTANTE: Atualize o seu window.onload atual para chamar o carregarHistorico() e atualizar o dropdown do filtro:
-        window.onload = async () => {
-            await carregarDadosIniciais();
-            
-            // Popula o Dropdown do filtro de histórico com os robôs existentes
-            const histFilter = document.getElementById('historyRobotFilter');
-            Object.keys(mapaRobos).forEach(id => {
-                histFilter.innerHTML += `<option value="${id}">${mapaRobos[id]}</option>`;
-            });
-
-            carregarFila();
-            carregarAgendamentos();
-            carregarCofre();
-            carregarHistorico(); // Chama o histórico na inicialização
-            setInterval(carregarFila, 3000);
-        };
-
-        // ------------------------------------------
-        // INICIALIZAÇÃO DA PÁGINA
+        // INICIALIZAÇÃO ÚNICA DA PÁGINA
         // ------------------------------------------
         window.onload = async () => {
             await carregarDadosIniciais();
+            
             carregarFila();
             carregarAgendamentos();
             carregarCofre();
+            carregarHistorico(); // Preenche a aba e o gráfico pela primeira vez
+            
             setInterval(carregarFila, 3000);
         };
     </script>
